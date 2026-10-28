@@ -1,0 +1,15 @@
+.git
+**/.aws
+**/.env
+**/.env.*
+**/*.md
+**/*.key
+**/*.pem
+**/*.pfx
+**/*.p12
+**/*.dump
+**/*.backup
+bin
+coverage
+*.test
+*.log

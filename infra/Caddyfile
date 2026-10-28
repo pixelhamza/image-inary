@@ -1,0 +1,27 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		Strict-Transport-Security "max-age=86400"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self' https://{$S3_BUCKET}.s3.{$AWS_REGION}.amazonaws.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+		-Server
+	}
+	@backend path /api/* /healthz /readyz
+	handle @backend {
+		reverse_proxy backend:8080
+	}
+	handle {
+		root * /srv
+		header Cache-Control no-store
+		try_files {path} /index.html
+		file_server
+	}
+	# Do not enable access logs containing API headers or signed transfer URLs.
+}

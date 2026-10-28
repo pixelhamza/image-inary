@@ -1,0 +1,55 @@
+# Requires Docker Compose on EC2, an existing private RDS database with the SQL
+# migration applied, a private S3 bucket with exact-origin CORS, and a TLS DNS
+# hostname pointing at EC2. No AWS resources are provisioned by this file.
+# EC2: require IMDSv2 and set its response hop limit to 2 for bridged containers.
+services:
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8080
+      DATABASE_URL: ${DATABASE_URL:?Set the RDS URL with sslmode=verify-full and sslrootcert=/etc/ssl/certs/aws-rds-ca.pem}
+      DEMO_API_TOKEN: ${DEMO_API_TOKEN:?Supply the operator credential outside the frontend bundle}
+      S3_BUCKET: ${S3_BUCKET:?Set the private bucket name}
+      AWS_REGION: ${AWS_REGION:?Set the AWS region}
+    volumes:
+      - type: bind
+        source: ${RDS_CA_BUNDLE:?Set the host path to the trusted AWS RDS CA bundle}
+        target: /etc/ssl/certs/aws-rds-ca.pem
+        read_only: true
+    expose: ["8080"]
+    read_only: true
+    tmpfs: ["/tmp:size=16m"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  web:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      DOMAIN: ${DOMAIN:?Set a real TLS hostname, not an EC2 IP or localhost}
+      ACME_EMAIL: ${ACME_EMAIL:?Set the TLS certificate contact email}
+      S3_BUCKET: ${S3_BUCKET:?Set the private bucket name}
+      AWS_REGION: ${AWS_REGION:?Set the AWS region}
+    ports: ["80:80", "443:443"]
+    volumes: ["caddy_data:/data", "caddy_config:/config"]
+    read_only: true
+    tmpfs: ["/tmp:size=16m"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+volumes:
+  caddy_data:
+  caddy_config:
