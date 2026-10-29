@@ -40,6 +40,15 @@ ssh_ true
 echo "Installing Docker and tools on the host (idempotent)..."
 ssh_ 'bash -s' <<'REMOTE_SCRIPT'
 set -euo pipefail
+if [[ ! -f /swapfile ]]; then
+  # t3.micro has only 1GiB RAM; a 2GiB swapfile keeps docker compose build
+  # from getting OOM-killed on the Go/Node build stages.
+  sudo fallocate -l 2G /swapfile
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+fi
 sudo apt-get update -y
 sudo apt-get install -y ca-certificates curl gnupg postgresql-client python3
 if ! command -v docker >/dev/null; then

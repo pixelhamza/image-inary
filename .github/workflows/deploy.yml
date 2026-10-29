@@ -1,0 +1,55 @@
+name: Deploy to EC2
+
+# This redeploys application CODE onto the EC2 host that infra/provision-aws.sh
+# and infra/deploy-app.sh already set up. It does not provision AWS resources,
+# does not touch RDS, and does not rewrite the host's existing .env. Run
+# infra/deploy-app.sh by hand first (once) before this workflow has anything
+# to redeploy onto.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-to-ec2
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync application source to EC2
+        run: |
+          rsync -az --delete \
+            --exclude '.git' --exclude 'node_modules' --exclude 'dist' --exclude 'bin' \
+            --exclude '.generated' --exclude '.env' --exclude '*.pem' \
+            --exclude 'test-results' --exclude 'playwright-report' --exclude 'coverage' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            backend database frontend infra \
+            "ubuntu@${{ secrets.EC2_HOST }}:~/imageinary/"
+
+      - name: Build and restart containers
+        run: |
+          ssh -i ~/.ssh/deploy_key "ubuntu@${{ secrets.EC2_HOST }}" '
+            set -euo pipefail
+            cd ~/imageinary
+            sudo docker compose --env-file .env -f infra/compose.yaml build
+            sudo docker compose --env-file .env -f infra/compose.yaml up -d
+            sudo docker compose --env-file .env -f infra/compose.yaml ps
+          '
+
+      - name: Verify health
+        run: |
+          sleep 5
+          curl --fail --retry 5 --retry-delay 5 "https://${{ secrets.EC2_HOST }}/healthz"
+          curl --fail --retry 5 --retry-delay 5 "https://${{ secrets.EC2_HOST }}/readyz"

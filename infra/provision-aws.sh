@@ -16,7 +16,7 @@ export AWS_PAGER=""
 AWS_PROFILE="imageinary"          # from: aws configure --profile imageinary
 AWS_REGION="ap-south-1"           # pick one region and keep it everywhere
 BUCKET_NAME="imageinary-media-526695891279"  # globally unique, lowercase, digits, hyphens only, no dots
-EC2_INSTANCE_TYPE="t3.small"      # t3.micro (1GiB RAM) can OOM during docker build; t3.small (2GiB) is safer
+EC2_INSTANCE_TYPE="t3.micro"      # 1GiB RAM; cheaper but can OOM during docker compose build — bump to t3.small if the build gets killed
 DB_INSTANCE_CLASS="db.t4g.micro"  # fall back to db.t3.micro if unavailable in your region
 DB_ALLOCATED_STORAGE_GB=20
 DB_NAME="imageinary"
@@ -239,7 +239,10 @@ echo "RDS endpoint: $DB_ENDPOINT"
 if ! have KEY_PAIR_NAME; then
   KEY_PAIR_NAME="imageinary-key"
   KEY_PATH="$HOME/.ssh/imageinary-key.pem"
-  if [[ ! -f "$KEY_PATH" ]]; then
+  # AWS is the source of truth, not the local file: teardown-aws.sh deletes
+  # the AWS-side key pair but leaves this file on disk, so a stale local
+  # file must not stop us from (re)creating the AWS key pair here.
+  if ! aws_ ec2 describe-key-pairs --key-names "$KEY_PAIR_NAME" >/dev/null 2>&1; then
     aws_ ec2 create-key-pair --key-name "$KEY_PAIR_NAME" --query 'KeyMaterial' --output text > "$KEY_PATH"
     chmod 400 "$KEY_PATH"
   fi
