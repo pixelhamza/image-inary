@@ -1,4 +1,4 @@
-# Imageinary  : D : D
+# Imageinary
 
 A cloud-native, end-to-end encrypted photo gallery built with React, Go, and AWS.
 
@@ -13,8 +13,6 @@ Imageinary lets you securely upload, store, view, and download your photos. Imag
 - **Storage:** Amazon S3
 - **Deployment:** AWS EC2, Docker
 - **Cloud Security:** IAM, VPC, HTTPS
-
-(soon to be REFURNISHED)
 
 ## Features
 
@@ -43,9 +41,7 @@ Media is encrypted in the browser and transferred directly to private S3 storage
 
 ## Project Status
 
- Under development — AWS Cloud Computing LA2 project.
+AWS Cloud Computing LA2 project.
 
-## License
 
-To be decided.
 
